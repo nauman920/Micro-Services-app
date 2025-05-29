@@ -1,0 +1,9 @@
+# Ignore node_modules in all subdirectories
+**/node_modules/
+
+# Ignore .env files in all subdirectories
+**/.env
+
+# Optional: System files/IDE files
+.DS_Store
+.idea/
