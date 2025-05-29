@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("User service connected to MongoDB"));
+  .then(() => console.log("User services connected to MongoDB"));
 
 const User = require('./models/User');
 

@@ -11,6 +11,8 @@ function App() {
   const [userForm, setUserForm] = useState({ name: '', email: '' });
   const [productForm, setProductForm] = useState({ name: '', price: '' });
   const [loading, setLoading] = useState(false);
+  const [userServiceDown, setUserServiceDown] = useState(false);
+  const [productServiceDown, setProductServiceDown] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState('users');
 
@@ -19,18 +21,52 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-fetch data when switching tabs (to show correct error)
+  useEffect(() => {
+    if (users.length === 0 && products.length === 0) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const fetchData = async () => {
     setErrorMsg('');
     setLoading(true);
+    setUserServiceDown(false);
+    setProductServiceDown(false);
+
     try {
-      const [userRes, productRes] = await Promise.all([
+      const [userRes, productRes] = await Promise.allSettled([
         axios.get(`${userApi}/users`),
         axios.get(`${productApi}/products`),
       ]);
-      setUsers(userRes.data);
-      setProducts(productRes.data);
+
+      // Handle users response
+      if (userRes.status === 'fulfilled') {
+        setUsers(userRes.value.data);
+      } else {
+        setUsers([]);
+        setUserServiceDown(true);
+        if (activeTab === 'users') setErrorMsg('User service is down. Users data unavailable.');
+      }
+
+      // Handle products response
+      if (productRes.status === 'fulfilled') {
+        setProducts(productRes.value.data);
+      } else {
+        setProducts([]);
+        setProductServiceDown(true);
+        if (activeTab === 'products') setErrorMsg('Product service is down. Products data unavailable.');
+      }
+
+      // Show generic error if both failed
+      if (userRes.status !== 'fulfilled' && productRes.status !== 'fulfilled') {
+        setErrorMsg('Both User and Product services are down.');
+      }
     } catch (error) {
-      setErrorMsg('Failed to fetch data. Please try again later.');
+      setErrorMsg('Unexpected error! Please try again.');
+      setUsers([]);
+      setProducts([]);
+      setUserServiceDown(true);
+      setProductServiceDown(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -49,7 +85,8 @@ function App() {
       setUserForm({ name: '', email: '' });
       await fetchData();
     } catch (error) {
-      setErrorMsg('Failed to add user. Please try again.');
+      setErrorMsg('Failed to add user. User service may be down.');
+      setUserServiceDown(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -64,7 +101,8 @@ function App() {
       await axios.delete(`${userApi}/users/${id}`);
       await fetchData();
     } catch (error) {
-      setErrorMsg('Failed to delete user. Please try again.');
+      setErrorMsg('Failed to delete user. User service may be down.');
+      setUserServiceDown(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -86,7 +124,8 @@ function App() {
       setProductForm({ name: '', price: '' });
       await fetchData();
     } catch (error) {
-      setErrorMsg('Failed to add product. Please try again.');
+      setErrorMsg('Failed to add product. Product service may be down.');
+      setProductServiceDown(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -101,7 +140,8 @@ function App() {
       await axios.delete(`${productApi}/products/${id}`);
       await fetchData();
     } catch (error) {
-      setErrorMsg('Failed to delete product. Please try again.');
+      setErrorMsg('Failed to delete product. Product service may be down.');
+      setProductServiceDown(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -188,6 +228,7 @@ function App() {
                     onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
                     className="w-full px-4 py-3 pl-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
                     required
+                    disabled={userServiceDown}
                   />
                   <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 </div>
@@ -199,18 +240,24 @@ function App() {
                     onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                     className="w-full px-4 py-3 pl-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
                     required
+                    disabled={userServiceDown}
                   />
                   <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || userServiceDown}
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
                 >
                   <Plus size={20} />
                   Add User
                 </button>
               </form>
+              {userServiceDown && (
+                <div className="mt-2 text-red-400 text-center font-semibold">
+                  User service unavailable.
+                </div>
+              )}
             </section>
 
             {/* Users List */}
@@ -218,7 +265,12 @@ function App() {
               <h3 className="text-xl font-bold mb-4">
                 Users ({users.length})
               </h3>
-              {users.length === 0 ? (
+              {userServiceDown ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Users className="mx-auto mb-4" size={48} />
+                  <p>User service is unavailable. Cannot fetch users.</p>
+                </div>
+              ) : users.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Users className="mx-auto mb-4" size={48} />
                   <p>No users yet. Add your first user above!</p>
@@ -236,7 +288,7 @@ function App() {
                       </div>
                       <button
                         onClick={() => handleDeleteUser(user._id)}
-                        disabled={loading}
+                        disabled={loading || userServiceDown}
                         aria-label={`Delete user ${user.name}`}
                         className="p-2 text-red-500 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-all duration-300"
                       >
@@ -274,6 +326,7 @@ function App() {
                     onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                     className="w-full px-4 py-3 pl-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300"
                     required
+                    disabled={productServiceDown}
                   />
                   <Package className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 </div>
@@ -287,18 +340,24 @@ function App() {
                     onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
                     className="w-full px-4 py-3 pl-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-300"
                     required
+                    disabled={productServiceDown}
                   />
                   <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || productServiceDown}
                   className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl font-semibold hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
                 >
                   <Plus size={20} />
                   Add Product
                 </button>
               </form>
+              {productServiceDown && (
+                <div className="mt-2 text-red-400 text-center font-semibold">
+                  Product service unavailable.
+                </div>
+              )}
             </section>
 
             {/* Products List */}
@@ -306,7 +365,12 @@ function App() {
               <h3 className="text-xl font-bold mb-4">
                 Products ({products.length})
               </h3>
-              {products.length === 0 ? (
+              {productServiceDown ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Package className="mx-auto mb-4" size={48} />
+                  <p>Product service is unavailable. Cannot fetch products.</p>
+                </div>
+              ) : products.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <Package className="mx-auto mb-4" size={48} />
                   <p>No products available. Add your first product above!</p>
@@ -324,7 +388,7 @@ function App() {
                       </div>
                       <button
                         onClick={() => handleDeleteProduct(product._id)}
-                        disabled={loading}
+                        disabled={loading || productServiceDown}
                         aria-label={`Delete product ${product.name}`}
                         className="p-2 text-red-500 hover:text-red-400 hover:bg-red-600/20 rounded-lg transition-all duration-300"
                       >
@@ -346,4 +410,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; 
