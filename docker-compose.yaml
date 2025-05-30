@@ -19,7 +19,7 @@ services:
     ports:
       - "5002:5002"
     restart: unless-stopped
-    working_dir: /app
+    working_dir: /usr/src/app
   frontend:
     image: nauman920/micro-service-frontend:latest
     container_name: frontend
