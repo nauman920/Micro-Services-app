@@ -33,5 +33,5 @@ services:
 
 # Optional: Define a default network (Docker Compose does this automatically)
 networks:
-  default:
-    driver: bridge
+     micro-service:
+        driver: bridge
