@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  user-service:
+    build:
+      context: ./user-service
+    container_name: user-service-be
+    networks:
+      - micro-service
+    ports:
+      - "5001:5001"
+    restart: unless-stopped
+    working_dir: /usr/src/app
+
+  product-service:
+    build:
+      context: ./product-service
+    container_name: product-service-be
+    networks:
+      - micro-service
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+    working_dir: /usr/src/app
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    networks:
+      - micro-service
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    working_dir: /app
+
+networks:
+  micro-service:
